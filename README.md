@@ -282,6 +282,12 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ### Debug Mode
 Set `DEBUG=True` in your .env file for verbose logging.
 
+### Publication
+[Cerebral Collective A Multi Agent Research Intelligence Platform](https://app.readytensor.ai/publications/cerebral-collective-a-multi-agent-research-intelligence-platform-cJVHWXVQxWIo)
+
+### Demo Video
+[Video Link](https://drive.google.com/file/d/1wWAZM6RbMTMF_Cg1uXIXMVQR3qLApFXp/view?usp=sharing)
+
 ## 📞 Support
 
 For support, email [zainshafique23@gmail.com] or create an issue on GitHub.
@@ -291,4 +297,4 @@ For support, email [zainshafique23@gmail.com] or create an issue on GitHub.
 - [Ollama](https://ollama.ai/) for local LLM capabilities
 - [Tavily](https://tavily.com/) for web search API
 - [LangChain](https://langchain.com/) for AI framework
-- [FastAPI](https://fastapi.tiangolo.com/) for the backend framework
+- [FastAPI](https://fastapi.tiangolo.com/) for the backend framework 
