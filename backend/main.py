@@ -16,7 +16,7 @@ from .services.research_service import ResearchService
 load_dotenv()
 
 # Initialize app
-app = FastAPI(title="Research Assistant Crew API")
+app = FastAPI(title="Cerebral Collective: A Multi-Agent Research Assistant")
 
 # Add CORS middleware
 app.add_middleware(

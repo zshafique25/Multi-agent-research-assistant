@@ -41,9 +41,9 @@ function App() {
       <Container maxW="container.lg" py={8}>
         <VStack spacing={8} align="stretch">
           <Box textAlign="center">
-            <Heading as="h1" size="xl">Research Assistant Crew</Heading>
+            <Heading as="h1" size="xl">Cerebral Collective</Heading>
             <Text mt={2} color="gray.600">
-              A multi-agent AI system that helps with academic research
+              A multi-agent AI system for comprehensive research
             </Text>
           </Box>
 
