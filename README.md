@@ -2,6 +2,8 @@
 
 A sophisticated multi-agent AI system that conducts comprehensive academic research using coordinated AI agents. The system breaks down complex research questions into manageable sub-questions and uses specialized agents to gather, analyze, and synthesize information.
 
+<img width="1365" height="925" alt="Capture" src="https://github.com/user-attachments/assets/df91e39f-ad35-46d1-a009-c1db3da54ceb" />
+
 ## 🚀 Features
 
 - **Multi-Agent Architecture**: Coordinated team of specialized AI agents
