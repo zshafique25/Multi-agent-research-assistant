@@ -7,6 +7,15 @@ from ..models.state import ResearchState, Message, Task
 from ..services.ollama_client import OllamaClient
 
 class ResearchManagerAgent:
+    # Role definition with capabilities and restrictions
+    role_description = (
+        "Coordinates research workflow and delegates tasks. "
+        "Capabilities: task assignment, progress tracking, research planning, report synthesis. "
+        "Restrictions: Cannot perform retrieval, analysis or evaluation directly. "
+        "Must delegate specialized tasks to appropriate agents."
+    )
+    allowed_tools = ["task_delegation", "workflow_management", "research_planning", "report_synthesis"]
+    
     def __init__(self):
         """Initialize the Research Manager Agent with Ollama."""
         # Initialize Ollama client
@@ -18,10 +27,11 @@ class ResearchManagerAgent:
         self.planning_prompt = PromptTemplate(
             input_variables=["research_question"],
             template="""
-            You are a Research Manager Agent responsible for planning and coordinating academic research.
+            You are a Research Manager Agent with the following role restrictions:
+            - You can only plan and coordinate research, not perform specialized tasks
+            - You must delegate retrieval, analysis and evaluation to specialized agents
             
-            Your task is to break down the following research question into 3-5 manageable sub-questions
-            that together will help answer the main question comprehensively:
+            Break down the research question into 3-5 manageable sub-questions and assign appropriate task types:
 
             Research Question: {research_question}
 
@@ -44,8 +54,10 @@ class ResearchManagerAgent:
         self.synthesis_prompt = PromptTemplate(
             input_variables=["research_question", "extracted_information", "evaluations"],
             template="""
-            As a Research Manager Agent, synthesize the following research findings into a cohesive report
-            that answers the main research question:
+            As a Research Manager Agent, synthesize research findings into a cohesive report.
+            Remember your role restrictions:
+            - You must use only the provided findings from specialized agents
+            - You cannot add new information not provided by other agents
             
             Research Question: {research_question}
             
@@ -64,7 +76,7 @@ class ResearchManagerAgent:
             6. Conclusion
             7. References
             
-            Ensure that your report is well-structured, flows logically, and thoroughly addresses the research question.
+            Ensure the report is based ONLY on the provided information.
             """
         )
     
