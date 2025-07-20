@@ -217,7 +217,20 @@ multi-agent-research-assistant/
 │   ├── config.py
 │   └── main.py              # FastAPI application
 ├── frontend/                # React frontend (optional)
-│   └── src/
+|   |── public/
+│   │   └── index.html
+│   ├── src/
+│   |   ├── components/
+│   |   |   ├── ResearchForm.js
+│   |   |   ├── ResearchResults.js
+│   │   |   └── ResearchStatus.js
+│   |   ├── services/
+│   |   |   └── api.js
+│   |   ├── styles/
+│   |   |   └── main.css
+│   |   ├── App.js
+│   |   └── index.js
+|   └── package.json
 ├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt
