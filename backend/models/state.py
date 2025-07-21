@@ -1,3 +1,4 @@
+from enum import Enum
 from datetime import datetime
 from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
@@ -14,12 +15,29 @@ def append_unique(existing: List, new: List) -> List:
         existing = []
     return list(set(existing + new))
 
+class MessageType(str, Enum):
+    """Enumeration of message types for agent communication"""
+    AGENT = "agent"
+    SYSTEM = "system"
+    HUMAN = "human"
+    HUMAN_INTERVENTION = "human_intervention"
+
 class Message(BaseModel):
-    """Message format for agent communication."""
+    """Enhanced message format for agent communication with type support"""
     role: str
     content: str
+    type: MessageType = Field(default=MessageType.AGENT)
     agent: Optional[str] = None
     timestamp: datetime = Field(default_factory=datetime.now)
+    
+    @classmethod
+    def human_intervention(cls, content: str, role: str = "user"):
+        """Create a human intervention message"""
+        return cls(
+            role=role,
+            content=content,
+            type=MessageType.HUMAN_INTERVENTION
+        )
 
 class Source(BaseModel):
     """Information source representation."""
@@ -70,6 +88,10 @@ class ResearchState(BaseModel):
     # Final outputs
     summary: str = ""
     report: str = ""
+
+    # New flag for pending interventions
+    pending_intervention: bool = False
+    intervention_context: Dict = Field(default_factory=dict)
     
     # Metadata
     start_time: datetime = Field(default_factory=datetime.now)
