@@ -1,9 +1,14 @@
 # backend/graph/research_graph.py
+from backend.services.approval_service import ApprovalService
+from backend.models.state import Message, MessageType
+from typing import Dict, Any, Set
+
 class SimpleOrchestrator:
     """A simple orchestrator that replaces LangGraph functionality."""
     
     def __init__(self, agents):
         self.agents = agents
+        self.approval_service = ApprovalService()  # Initialize approval service
     
     def stream(self, initial_state, config=None):
         """Run the research workflow and yield states at each step."""
@@ -31,9 +36,23 @@ class SimpleOrchestrator:
                 print("No next agent available. Workflow complete.")
                 break
             
+            # BEFORE AGENT EXECUTION: Check if next agent requires approval
+            if self._requires_approval(next_agent, state):
+                if not self._get_approval(next_agent, state):
+                    # Handle rejection
+                    state = self._handle_rejection(next_agent, state)
+                    yield state
+                    continue  # Skip agent execution
+            
             # Process state with the selected agent
             print(f"Running agent: {next_agent}")
             state = self.agents[next_agent](state)
+            
+            # AFTER AGENT EXECUTION: Check if results need approval
+            if self._requires_result_approval(next_agent, state):
+                if not self._get_approval(next_agent, state, is_result=True):
+                    # Handle result rejection
+                    state = self._handle_result_rejection(next_agent, state)
             
             # Yield the updated state
             yield state
@@ -208,6 +227,92 @@ Further research is recommended to fully address {state.research_question}.
         
         # Default to research manager for coordination
         return "research_manager"
+    
+    def _requires_approval(self, agent_name: str, state) -> bool:
+        """Determine if agent action requires approval"""
+        CRITICAL_AGENTS: Set[str] = {"report_generation"}
+        CRITICAL_STATES: Set[str] = {"generate_final_report", "publish_results"}
+        
+        # Always require approval for report generation
+        if agent_name in CRITICAL_AGENTS:
+            return True
+        
+        # Require approval for high-risk actions
+        if any(task.description.lower() in CRITICAL_STATES 
+               for task in state.tasks 
+               if task.id not in state.completed_tasks):
+            return True
+        
+        return False
+    
+    def _requires_result_approval(self, agent_name: str, state) -> bool:
+        """Determine if agent's results need approval"""
+        RESULT_APPROVAL_AGENTS: Set[str] = {"critical_evaluation", "report_generation"}
+        return agent_name in RESULT_APPROVAL_AGENTS
+    
+    def _get_approval(self, agent_name: str, state, is_result=False) -> bool:
+        """Request approval from user"""
+        action_type = "RESULT_APPROVAL" if is_result else "ACTION_APPROVAL"
+        context: Dict[str, Any] = {
+            "current_state": state.status,
+            "pending_tasks": [t.description for t in state.tasks if t.id not in state.completed_tasks],
+            "last_messages": [msg.content for msg in state.messages[-3:]]
+        }
+        
+        # Add agent-specific context
+        if agent_name == "report_generation":
+            context["report_draft"] = getattr(state, "report_draft", "No draft available")
+        elif agent_name == "critical_evaluation":
+            context["evaluation_summary"] = getattr(state, "evaluation_summary", "No evaluation available")
+        
+        return self.approval_service.request_approval_sync(
+            agent=agent_name,
+            action=f"{action_type}: {agent_name}",
+            context=context
+        )
+    
+    def _handle_rejection(self, agent_name: str, state):
+        """Handle user rejection of an action"""
+        state.messages.append(Message.human_intervention(
+            content=f"Action for {agent_name} was rejected by user. Skipping this action."
+        ))
+        
+        # If report generation was rejected, mark task as complete but add note
+        if agent_name == "report_generation":
+            report_tasks = [t for t in state.tasks if t.type == "report"]
+            for task in report_tasks:
+                if task.id not in state.completed_tasks:
+                    state.completed_tasks.append(task.id)
+                    state.messages.append(Message.human_intervention(
+                        content="Report generation skipped by user request"
+                    ))
+        
+        return state
+    
+    def _handle_result_rejection(self, agent_name: str, state):
+        """Handle user rejection of agent results"""
+        rejection_msg = f"Results from {agent_name} were rejected by user. Re-running agent."
+        state.messages.append(Message.human_intervention(content=rejection_msg))
+        
+        # Reset agent-specific state
+        if agent_name == "critical_evaluation":
+            state.evaluation_summary = None
+            state.evaluation_results = []
+        elif agent_name == "report_generation":
+            state.report_draft = None
+        
+        # Remove completion status for the task
+        agent_task_types = {
+            "critical_evaluation": "evaluate",
+            "report_generation": "report"
+        }
+        task_type = agent_task_types.get(agent_name)
+        if task_type:
+            for task in state.tasks:
+                if task.type == task_type and task.id in state.completed_tasks:
+                    state.completed_tasks.remove(task.id)
+        
+        return state
 
 def create_research_graph():
     """Create and configure the research workflow."""
