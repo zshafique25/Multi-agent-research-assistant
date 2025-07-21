@@ -7,6 +7,15 @@ from ..tools.web_search import WebSearchTool
 from ..services.ollama_client import OllamaClient
 
 class InformationRetrievalAgent:
+    # Role definition with capabilities and restrictions
+    role_description = (
+        "Specializes in information retrieval. "
+        "Capabilities: web search, keyword extraction, source evaluation. "
+        "Restrictions: Cannot analyze content, generate reports, or make final credibility determinations. "
+        "Must limit actions to information gathering only."
+    )
+    allowed_tools = ["web_search", "scholar_search", "keyword_extraction", "source_evaluation"]
+    
     def __init__(self):
         """Initialize the Information Retrieval Agent."""
         self.llm = OllamaClient(
@@ -21,34 +30,39 @@ class InformationRetrievalAgent:
         self.keyword_extraction_prompt = PromptTemplate(
             input_variables=["research_question", "sub_question"],
             template="""
-            Extract 3-5 effective search keywords for researching the following question:
+            As an Information Retrieval Specialist, extract 3-5 effective search keywords for researching:
             
             Main Research Question: {research_question}
             Sub-question: {sub_question}
             
-            Provide keywords that would yield the most relevant academic or scholarly results.
-            Format your response as a comma-separated list of keywords or phrases.
+            Remember your role restrictions:
+            - Focus only on keyword extraction, not analysis
+            - Keywords should target academic/scholarly sources
+            
+            Format response as comma-separated keywords.
             """
         )
         
         self.source_evaluation_prompt = PromptTemplate(
             input_variables=["search_results", "research_question"],
             template="""
-            Evaluate the following search results for their relevance and credibility
-            in answering this research question:
+            As an Information Retrieval Specialist, evaluate search results for relevance and credibility:
             
             Research Question: {research_question}
-            
             Search Results:
             {search_results}
             
+            Remember your role restrictions:
+            - Provide preliminary assessments only (final evaluation is done by EvaluationAgent)
+            - Focus on surface-level relevance and source credibility indicators
+            
             For each result, provide:
             1. Relevance score (0-10)
-            2. Credibility assessment (0-10)
-            3. Brief explanation of why it's relevant or not
-            4. Whether it should be included in the research (Yes/No)
+            2. Credibility indicators (0-10)
+            3. Brief reason for inclusion/exclusion
+            4. Preliminary inclusion recommendation (Yes/No)
             
-            Format your response as a JSON-like structure.
+            Format as JSON-like structure.
             """
         )
     
