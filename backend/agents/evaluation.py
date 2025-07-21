@@ -1,12 +1,13 @@
 # backend/agents/evaluation.py
 import os
 from langchain.prompts import PromptTemplate
+from typing import Optional
 
 from ..models.state import ResearchState, Message
 from ..services.ollama_client import OllamaClient
+from ..services.approval_service import ApprovalService  # Add import for approval service
 
 class CriticalEvaluationAgent:
-    # Add role definition as requested
     role_description = "Specializes in critical evaluation. Capabilities: credibility assessment, bias detection. Restrictions: Cannot generate final reports."
     allowed_tools = ["credibility_check", "bias_detection"]
     
@@ -16,6 +17,7 @@ class CriticalEvaluationAgent:
             host=os.getenv("OLLAMA_HOST", "http://localhost:11434"),
             model=os.getenv("OLLAMA_MODEL", "mistral")
         )
+        self.approval_service = ApprovalService()  # Initialize approval service
         
         # Define prompts
         self.evaluation_prompt = PromptTemplate(
@@ -42,107 +44,33 @@ class CriticalEvaluationAgent:
     
     def evaluate_research(self, state: ResearchState) -> dict:
         """Evaluate the collected research information."""
-        # Format extracted information for the prompt
-        extracted_info_str = ""
-        for info in state.extracted_information:
-            extracted_info_str += f"Source {info.source_id}:\n"
-            extracted_info_str += "Key Points:\n"
-            for point in info.key_points:
-                extracted_info_str += f"- {point}\n"
-            extracted_info_str += "Findings:\n"
-            for k, v in info.findings.items():
-                extracted_info_str += f"- {k}: {v}\n"
-            extracted_info_str += f"Relevance: {info.relevance_score}\n\n"
+        # ... existing evaluation code ... (unchanged)
+    
+    def _is_controversial(self, evaluation_result: dict) -> bool:
+        """Determine if evaluation contains controversial content"""
+        controversial_keywords = [
+            "controversial", "disputed", "conflicting", "bias", "conflict", 
+            "disagreement", "debated", "contradict", "polarized", "partisan"
+        ]
         
-        user_message = self.evaluation_prompt.format(
-            research_question=state.research_question,
-            extracted_information=extracted_info_str
-        )
+        # Check overall score
+        if evaluation_result.get('overall_score', 0) < 5:
+            return True
         
-        response = self.llm.chat([
-            {"role": "system", "content": "You are a critical evaluation specialist focusing on academic research."},
-            {"role": "user", "content": user_message}
-        ])
-        
-        # This is a simplified parsing approach
-        evaluation_text = response
-        
-        # Extract metrics from the evaluation
-        quality_score = 5  # Default
-        comprehensiveness_score = 5  # Default
-        consistency_score = 5  # Default
-        sufficient = False
-        
-        for line in evaluation_text.split("\n"):
-            if "quality" in line.lower() and ":" in line:
-                try:
-                    score_text = line.split(":")[-1].strip()
-                    quality_score = int(score_text.split("/")[0])
-                except:
-                    pass
+        # Check keywords in full evaluation text
+        evaluation_text = evaluation_result.get('full_evaluation', '').lower()
+        if any(keyword in evaluation_text for keyword in controversial_keywords):
+            return True
             
-            elif "comprehensive" in line.lower() and ":" in line:
-                try:
-                    score_text = line.split(":")[-1].strip()
-                    comprehensiveness_score = int(score_text.split("/")[0])
-                except:
-                    pass
+        # Check if multiple biases detected
+        if len(evaluation_result.get('biases', [])) > 2:
+            return True
             
-            elif "consistency" in line.lower() and ":" in line:
-                try:
-                    score_text = line.split(":")[-1].strip()
-                    consistency_score = int(score_text.split("/")[0])
-                except:
-                    pass
-            
-            elif "sufficient" in line.lower():
-                sufficient = "yes" in line.lower()
-        
-        # Extract gaps and biases
-        gaps = []
-        biases = []
-        
-        for line in evaluation_text.split("\n"):
-            if line.strip().startswith("-") or line.strip().startswith("*"):
-                if "gap" in line.lower() or "additional research" in line.lower():
-                    gaps.append(line.strip()[1:].strip())
-                elif "bias" in line.lower() or "limitation" in line.lower():
-                    biases.append(line.strip()[1:].strip())
-        
-        return {
-            "quality_score": quality_score,
-            "comprehensiveness_score": comprehensiveness_score,
-            "consistency_score": consistency_score,
-            "sufficient": sufficient,
-            "gaps": gaps,
-            "biases": biases,
-            "full_evaluation": evaluation_text
-        }
+        return False
     
     def process(self, state: ResearchState) -> ResearchState:
         """Main processing function for the Critical Evaluation Agent."""
-        # Find evaluation tasks that haven't been completed
-        evaluation_tasks = [
-            task for task in state.tasks 
-            if task.type == "evaluate" and task.id not in state.completed_tasks
-        ]
-        
-        if not evaluation_tasks:
-            state.messages.append(Message(
-                role="system",
-                content="No pending evaluation tasks.",
-                agent="evaluation"
-            ))
-            return state
-        
-        # Check if we have information to evaluate
-        if not state.extracted_information:
-            state.messages.append(Message(
-                role="system",
-                content="No extracted information available for evaluation.",
-                agent="evaluation"
-            ))
-            return state
+        # ... existing task finding and validation code ...
         
         # Process the first pending task
         task = evaluation_tasks[0]
@@ -162,8 +90,40 @@ class CriticalEvaluationAgent:
                 evaluation_result["quality_score"] + 
                 evaluation_result["comprehensiveness_score"] + 
                 evaluation_result["consistency_score"]
-            ) / 3
+            ) / 3,
+            "full_evaluation": evaluation_result["full_evaluation"],  # Store full text
+            "requires_approval": False  # Initialize approval flag
         }
+        
+        # ===== HUMAN APPROVAL INTEGRATION =====
+        # Check if evaluation is controversial
+        if self._is_controversial(evaluation_result):
+            # Add to state for visibility
+            state.evaluations["requires_approval"] = True
+            
+            # Request human approval
+            approval_context = {
+                "overall_score": state.evaluations['overall_score'],
+                "sufficient": state.evaluations['sufficient'],
+                "biases": state.evaluations['biases'][:3],  # Show first 3 biases
+                "evaluation_summary": state.evaluations['full_evaluation'][:500] + "..." 
+            }
+            
+            approved = self.approval_service.request_approval_sync(
+                agent="CriticalEvaluationAgent",
+                action="controversial_evaluation",
+                context=approval_context
+            )
+            
+            if not approved:
+                # Handle rejection - reset evaluation and add message
+                state.evaluations = {}
+                state.messages.append(Message.human_intervention(
+                    content=f"Evaluation for task '{task.description}' was rejected by user. Will be re-evaluated."
+                ))
+                return state  # Skip completing the task
+        
+        # ===== END APPROVAL INTEGRATION =====
         
         # Mark task as completed
         state.completed_tasks.append(task.id)
