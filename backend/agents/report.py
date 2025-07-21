@@ -7,6 +7,10 @@ from ..tools.citation import CitationGeneratorTool
 from ..services.ollama_client import OllamaClient
 
 class ReportGenerationAgent:
+    # Add specialized role definition here
+    role_description = "Specializes in report generation. Capabilities: structured writing, citation formatting. Restrictions: Cannot evaluate sources directly."
+    allowed_tools = ["draft_report", "format_citations"]
+    
     def __init__(self):
         """Initialize the Report Generation Agent."""
         self.llm = OllamaClient(
