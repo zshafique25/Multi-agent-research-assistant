@@ -1,13 +1,14 @@
 # backend/agents/report.py
 import os
 from langchain.prompts import PromptTemplate
+from typing import Optional
 
+from ..services.approval_service import ApprovalService
 from ..models.state import ResearchState, Message, Source
 from ..tools.citation import CitationGeneratorTool
 from ..services.ollama_client import OllamaClient
 
 class ReportGenerationAgent:
-    # Add specialized role definition here
     role_description = "Specializes in report generation. Capabilities: structured writing, citation formatting. Restrictions: Cannot evaluate sources directly."
     allowed_tools = ["draft_report", "format_citations"]
     
@@ -18,8 +19,9 @@ class ReportGenerationAgent:
             model=os.getenv("OLLAMA_MODEL", "mistral")
         )
         
-        # Initialize tools
+        # Initialize tools and services
         self.citation_tool = CitationGeneratorTool()
+        self.approval_service = ApprovalService()  # Add approval service
         
         # Define prompts
         self.report_prompt = PromptTemplate(
@@ -64,18 +66,16 @@ class ReportGenerationAgent:
             }
             
             try:
-                # Use the citation tool correctly by passing source_info as a parameter
                 citation = self.citation_tool.generate_citation(source_info=source_info, style="APA")
                 citations.append(citation)
             except Exception as e:
                 print(f"Error generating citation: {str(e)}")
-                # Create a fallback citation if generation fails
                 citations.append(f"{source.title}. Retrieved from {source.url}")
         
         return citations
     
     def process(self, state: ResearchState) -> ResearchState:
-        """Main processing function for the Report Generation Agent."""
+        """Main processing function for the Report Generation Agent with approval workflow"""
         # Find report tasks that haven't been completed
         report_tasks = [
             task for task in state.tasks 
@@ -105,12 +105,31 @@ class ReportGenerationAgent:
             ))
             return state
         
+        # === HUMAN APPROVAL INTEGRATION POINT 1: BEFORE GENERATION ===
+        # Request approval before starting report generation
+        approval_context = {
+            "research_question": state.research_question,
+            "sources_count": len(state.sources),
+            "pending_tasks": [t.description for t in state.tasks if t.id not in state.completed_tasks]
+        }
+        
+        if not self.approval_service.request_approval_sync(
+            agent="ReportAgent",
+            action="start_report_generation",
+            context=approval_context
+        ):
+            # Handle rejection
+            state.messages.append(Message.human_intervention(
+                content="Report generation was rejected by user before starting."
+            ))
+            return state
+        
+        # === REPORT DRAFT GENERATION ===
         # Generate citations
         try:
             citations = self.generate_citations(state.sources)
         except Exception as e:
             print(f"Error in citation generation: {str(e)}")
-            # Create basic citations if the generation fails
             citations = [f"Source {i+1}: {source.title}. {source.url}" for i, source in enumerate(state.sources)]
         
         # Format extracted information for the prompt
@@ -143,7 +162,7 @@ class ReportGenerationAgent:
         for citation in citations:
             evaluations_str += f"- {citation}\n"
         
-        # Generate the report
+        # Generate the report DRAFT
         user_message = self.report_prompt.format(
             research_question=state.research_question,
             extracted_information=extracted_info_str,
@@ -156,19 +175,40 @@ class ReportGenerationAgent:
                 {"role": "user", "content": user_message}
             ])
             
-            # Update state with the report
-            state.report = response
+            # Store as DRAFT, not final report yet
+            state.report_draft = response
         except Exception as e:
-            print(f"Error generating report: {str(e)}")
-            # Create a fallback report
-            state.report = self._create_fallback_report(state)
+            print(f"Error generating report draft: {str(e)}")
+            state.report_draft = self._create_fallback_report(state)
         
-        # Generate a summary
+        # === HUMAN APPROVAL INTEGRATION POINT 2: AFTER DRAFT ===
+        # Request approval for the generated draft
+        draft_context = {
+            "research_question": state.research_question,
+            "draft_summary": state.report_draft[:500] + "..." if state.report_draft else "No draft generated",
+            "draft_length": len(state.report_draft) if state.report_draft else 0
+        }
+        
+        if not self.approval_service.request_approval_sync(
+            agent="ReportAgent",
+            action="approve_report_draft",
+            context=draft_context
+        ):
+            # Handle draft rejection
+            state.messages.append(Message.human_intervention(
+                content=f"Report draft was rejected by user. Generation halted."
+            ))
+            # Reset draft and return without completing task
+            state.report_draft = None
+            return state
+        
+        # === FINAL REPORT PROCESSING (ONLY IF DRAFT APPROVED) ===
+        # Generate summary from approved draft
         try:
             summary_prompt = f"""
             Provide a concise summary (2-3 paragraphs) of the following research report:
             
-            {state.report[:2000]}...
+            {state.report_draft[:2000]}...
             
             Focus on the key findings and conclusions.
             """
@@ -181,17 +221,19 @@ class ReportGenerationAgent:
             state.summary = summary_response
         except Exception as e:
             print(f"Error generating summary: {str(e)}")
-            # Create a fallback summary
             state.summary = f"This research investigated {state.research_question}. The report examines various aspects and implications based on the gathered information."
+        
+        # Set final report to approved draft
+        state.report = state.report_draft
         
         # Mark task as completed
         state.completed_tasks.append(task.id)
         state.status = "complete"
         
-        # Add message to state
+        # Add success message
         state.messages.append(Message(
             role="system",
-            content="Research report and summary generated successfully.",
+            content="Research report and summary generated successfully after approval.",
             agent="report"
         ))
         
@@ -199,17 +241,12 @@ class ReportGenerationAgent:
     
     def _create_fallback_report(self, state: ResearchState) -> str:
         """Create a fallback report if the normal generation fails."""
-        # Extract source titles
         source_list = "\n".join([f"- {source.title}" for source in state.sources])
-        
-        # Extract key points from all sources
         all_points = []
         for info in state.extracted_information:
             all_points.extend(info.key_points)
-        
         key_points_list = "\n".join([f"- {point}" for point in all_points[:10]])
         
-        # Create the fallback report
         return f"""# Research Report: {state.research_question}
 
 ## Executive Summary
