@@ -1,6 +1,6 @@
 from enum import Enum
 from datetime import datetime
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 from pydantic import BaseModel, Field
 
 def add_messages(existing: List, new: List) -> List:
@@ -89,9 +89,15 @@ class ResearchState(BaseModel):
     summary: str = ""
     report: str = ""
 
-    # New flag for pending interventions
-    pending_intervention: bool = False
-    intervention_context: Dict = Field(default_factory=dict)
+    # Approval-related fields
+    report_draft: Optional[str] = None  # Draft version of report before approval
+    evaluation_summary: Optional[str] = None  # Summary of evaluation for approval
+    requires_approval: bool = False  # Flag indicating if approval is needed
+    approval_context: Dict[str, Any] = Field(default_factory=dict)  # Context for approval request
+    
+    # Intervention tracking
+    pending_intervention: bool = False  # General flag for any intervention
+    intervention_context: Dict = Field(default_factory=dict)  # Context for intervention
     
     # Metadata
     start_time: datetime = Field(default_factory=datetime.now)
