@@ -6,6 +6,10 @@ from ..models.state import ResearchState, Message
 from ..services.ollama_client import OllamaClient
 
 class CriticalEvaluationAgent:
+    # Add role definition as requested
+    role_description = "Specializes in critical evaluation. Capabilities: credibility assessment, bias detection. Restrictions: Cannot generate final reports."
+    allowed_tools = ["credibility_check", "bias_detection"]
+    
     def __init__(self):
         """Initialize the Critical Evaluation Agent."""
         self.llm = OllamaClient(
