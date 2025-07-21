@@ -7,6 +7,9 @@ from ..tools.summarization import SummarizationTool
 from ..services.ollama_client import OllamaClient
 
 class DocumentAnalysisAgent:
+    role_description = "Specializes in document analysis. Capabilities: summarization, key point extraction. Restrictions: Cannot retrieve new information or generate final reports."
+    allowed_tools = ["summarize_document", "extract_keypoints"]
+    
     def __init__(self):
         """Initialize the Document Analysis Agent."""
         self.llm = OllamaClient(
@@ -21,6 +24,16 @@ class DocumentAnalysisAgent:
         self.analysis_prompt = PromptTemplate(
             input_variables=["source_content", "research_question"],
             template="""
+            [ROLE: Document Analysis Specialist]
+            You are specialized in analyzing research documents. Your capabilities are limited to:
+            - Summarizing content
+            - Extracting key information
+            - Identifying methodologies and limitations
+            
+            You CANNOT:
+            - Retrieve new information from external sources
+            - Generate final research reports
+            
             Analyze the following source content in the context of this research question:
             
             Research Question: {research_question}
