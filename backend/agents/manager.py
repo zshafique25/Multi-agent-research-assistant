@@ -260,6 +260,12 @@ class ResearchManagerAgent:
                 state.tasks = tasks
                 state.status = "researching"
                 
+                # Add metadata to state
+                state.metadata = {
+                    "agent": self.__class__.__name__,
+                    "tools_used": ["research_planning"]
+                }
+                
                 # Add message to state
                 state.messages.append(Message(
                     role="system",
@@ -310,6 +316,10 @@ class ResearchManagerAgent:
                     )
                 ]
                 state.status = "researching"
+                state.metadata = {
+                    "agent": self.__class__.__name__,
+                    "tools_used": ["research_planning"]
+                }
                 state.messages.append(Message(
                     role="system",
                     content=f"Default research plan created due to error: {str(e)}",
@@ -365,6 +375,12 @@ class ResearchManagerAgent:
         state.report = response
         state.status = "complete"
         
+        # Add metadata to state
+        state.metadata = {
+            "agent": self.__class__.__name__,
+            "tools_used": ["report_synthesis"]
+        }
+        
         # Add message to state
         state.messages.append(Message(
             role="system",
@@ -394,5 +410,11 @@ class ResearchManagerAgent:
                 content=f"Research in progress. Completed {completed_count}/{total_count} tasks.",
                 agent="manager"
             ))
+            
+            # Add metadata for coordination tasks
+            state.metadata = {
+                "agent": self.__class__.__name__,
+                "tools_used": ["workflow_management"]
+            }
             
             return state
