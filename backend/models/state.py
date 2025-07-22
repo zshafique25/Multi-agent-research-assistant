@@ -99,7 +99,10 @@ class ResearchState(BaseModel):
     pending_intervention: bool = False  # General flag for any intervention
     intervention_context: Dict = Field(default_factory=dict)  # Context for intervention
     
-    # Metadata
+    # Metadata for performance tracking
+    metadata: Dict[str, Any] = Field(default_factory=dict)  # Track agent and tool usage
+    
+    # Timestamps
     start_time: datetime = Field(default_factory=datetime.now)
     last_updated: datetime = Field(default_factory=datetime.now)
     status: str = "planning"  # planning, researching, analyzing, reporting, complete
