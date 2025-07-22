@@ -55,9 +55,11 @@ class DocumentAnalysisAgent:
     def analyze_source(self, source_content: str, research_question: str) -> dict:
         """Analyze a source to extract relevant information."""
         # First, summarize if the content is too long
+        tools_used = []
         if len(source_content) > 8000:
             try:
                 source_content = self.summarizer.summarize_text(source_content, "long")
+                tools_used.append("summarize_document")
             except Exception as e:
                 print(f"Error summarizing content: {str(e)}")
         
@@ -146,7 +148,8 @@ class DocumentAnalysisAgent:
             "key_points": key_points[:5],  # Limit to 5 key points
             "findings": findings,
             "relevance_score": relevance_score,
-            "full_analysis": analysis_text
+            "full_analysis": analysis_text,
+            "tools_used": tools_used
         }
     
     def process(self, state: ResearchState) -> ResearchState:
@@ -183,6 +186,7 @@ class DocumentAnalysisAgent:
         
         # Analyze each source
         sources_analyzed = 0
+        tools_used = []  # Track tools used in this processing step
         for i, source in enumerate(state.sources):
             # Skip sources that have already been analyzed
             if any(info.source_id == str(i) for info in state.extracted_information):
@@ -208,6 +212,8 @@ class DocumentAnalysisAgent:
                     extracted_by="analysis"
                 ))
                 
+                # Collect tools used
+                tools_used.extend(analysis_result.get("tools_used", []))
                 sources_analyzed += 1
             except Exception as e:
                 print(f"Error analyzing source {i}: {str(e)}")
@@ -223,6 +229,12 @@ class DocumentAnalysisAgent:
         
         # Mark task as completed
         state.completed_tasks.append(task.id)
+        
+        # Add metadata to state
+        state.metadata = {
+            "agent": self.__class__.__name__,
+            "tools_used": list(set(tools_used))  # Deduplicate tools
+        }
         
         # Add message to state
         state.messages.append(Message(
