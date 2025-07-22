@@ -149,6 +149,8 @@ class InformationRetrievalAgent:
     
     def process(self, state: ResearchState) -> ResearchState:
         """Main processing function for the Information Retrieval Agent."""
+        tools_used = []  # Track tools used in this processing step
+        
         # Find retrieval tasks that haven't been completed
         retrieval_tasks = [
             task for task in state.tasks 
@@ -172,10 +174,12 @@ class InformationRetrievalAgent:
         
         # Extract keywords for searching
         keywords = self.extract_keywords(state.research_question, sub_question)
+        tools_used.append("keyword_extraction")
         
         # Perform web search
         try:
             search_results = self.web_search_tool.web_search(keywords)
+            tools_used.append("web_search")
             
             # Check if search was successful
             if isinstance(search_results, list) and len(search_results) > 0:
@@ -183,6 +187,7 @@ class InformationRetrievalAgent:
                 
                 # Evaluate sources
                 evaluated_sources = self.evaluate_sources(search_results, sub_question)
+                tools_used.append("source_evaluation")
                 
                 # Add relevant sources to state
                 sources_added = 0
@@ -235,6 +240,12 @@ class InformationRetrievalAgent:
         
         # Mark task as completed
         state.completed_tasks.append(task.id)
+        
+        # Add metadata to state
+        state.metadata = {
+            "agent": self.__class__.__name__,
+            "tools_used": tools_used
+        }
         
         # Add message to state
         state.messages.append(Message(
