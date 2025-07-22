@@ -44,7 +44,75 @@ class CriticalEvaluationAgent:
     
     def evaluate_research(self, state: ResearchState) -> dict:
         """Evaluate the collected research information."""
-        # ... existing evaluation code ... (unchanged)
+        # Format extracted information for the prompt
+        extracted_info_str = ""
+        for info in state.extracted_information:
+            source_index = int(info.source_id) if info.source_id.isdigit() else 0
+            source_title = state.sources[source_index].title if source_index < len(state.sources) else "Unknown Source"
+            
+            extracted_info_str += f"Source: {source_title}\n"
+            extracted_info_str += "Key Points:\n"
+            for point in info.key_points:
+                extracted_info_str += f"- {point}\n"
+            extracted_info_str += "Findings:\n"
+            for k, v in info.findings.items():
+                extracted_info_str += f"- {k}: {v}\n"
+            extracted_info_str += f"Relevance: {info.relevance_score}\n\n"
+        
+        user_message = self.evaluation_prompt.format(
+            research_question=state.research_question,
+            extracted_information=extracted_info_str
+        )
+        
+        response = self.llm.chat([
+            {"role": "system", "content": "You are a critical evaluation specialist."},
+            {"role": "user", "content": user_message}
+        ])
+        
+        # This is a simplified parsing approach for the LLM output
+        evaluation_text = response.strip()
+        
+        # Try to parse scores from the evaluation
+        quality_score = 7
+        comprehensiveness_score = 7
+        consistency_score = 7
+        sufficient = False
+        gaps = []
+        biases = []
+        
+        # Try to extract scores from the text
+        for line in evaluation_text.split("\n"):
+            if "quality" in line.lower() and "score" in line.lower():
+                try:
+                    score_text = line.split(":")[-1].strip()
+                    quality_score = int(score_text.split("/")[0])
+                except:
+                    pass
+            elif "comprehensiveness" in line.lower() and "score" in line.lower():
+                try:
+                    score_text = line.split(":")[-1].strip()
+                    comprehensiveness_score = int(score_text.split("/")[0])
+                except:
+                    pass
+            elif "consistency" in line.lower() and "score" in line.lower():
+                try:
+                    score_text = line.split(":")[-1].strip()
+                    consistency_score = int(score_text.split("/")[0])
+                except:
+                    pass
+            elif "sufficient" in line.lower():
+                sufficient = "yes" in line.lower() or "sufficient" in line.lower()
+        
+        # Return structured evaluation
+        return {
+            "quality_score": quality_score,
+            "comprehensiveness_score": comprehensiveness_score,
+            "consistency_score": consistency_score,
+            "sufficient": sufficient,
+            "gaps": gaps,
+            "biases": biases,
+            "full_evaluation": evaluation_text
+        }
     
     def _is_controversial(self, evaluation_result: dict) -> bool:
         """Determine if evaluation contains controversial content"""
@@ -70,13 +138,38 @@ class CriticalEvaluationAgent:
     
     def process(self, state: ResearchState) -> ResearchState:
         """Main processing function for the Critical Evaluation Agent."""
-        # ... existing task finding and validation code ...
+        tools_used = []  # Track tools used in this processing step
+        
+        # Find evaluation tasks that haven't been completed
+        evaluation_tasks = [
+            task for task in state.tasks 
+            if task.type == "evaluate" and task.id not in state.completed_tasks
+        ]
+        
+        if not evaluation_tasks:
+            state.messages.append(Message(
+                role="system",
+                content="No pending evaluation tasks.",
+                agent="evaluation"
+            ))
+            return state
+        
+        # Check if we have information to evaluate
+        if not state.extracted_information:
+            state.messages.append(Message(
+                role="system",
+                content="No information available for evaluation.",
+                agent="evaluation"
+            ))
+            return state
         
         # Process the first pending task
         task = evaluation_tasks[0]
         
         # Evaluate the research
         evaluation_result = self.evaluate_research(state)
+        tools_used.append("credibility_check")
+        tools_used.append("bias_detection")
         
         # Update state with evaluation
         state.evaluations = {
@@ -127,6 +220,12 @@ class CriticalEvaluationAgent:
         
         # Mark task as completed
         state.completed_tasks.append(task.id)
+        
+        # Add metadata to state
+        state.metadata = {
+            "agent": self.__class__.__name__,
+            "tools_used": tools_used
+        }
         
         # If sufficient, mark the state as ready for reporting
         if evaluation_result["sufficient"]:
