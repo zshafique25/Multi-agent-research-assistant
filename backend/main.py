@@ -12,16 +12,13 @@ from dotenv import load_dotenv
 
 from .models.state import ResearchState
 from .services.research_service import ResearchService
-from .evaluation.metrics import ResearchMetrics  # Add this import
+from .config import config  
 
 # Load environment variables
 load_dotenv()
 
 # Initialize app
 app = FastAPI(title="Cerebral Collective: A Multi-Agent Research Assistant")
-
-# Initialize metrics
-research_metrics = ResearchMetrics()  # Add metrics instance
 
 # Add CORS middleware
 app.add_middleware(
@@ -32,8 +29,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize services - pass metrics to ResearchService
-research_service = ResearchService(metrics=research_metrics)  # Updated
+# Initialize services using shared config metrics
+research_service = ResearchService(metrics=config.metrics)
 
 # Request and response models
 class ResearchRequest(BaseModel):
@@ -159,7 +156,7 @@ async def get_research_messages(research_id: str):
 @app.get("/api/performance-report")
 async def get_performance_report():
     """Endpoint to retrieve performance metrics"""
-    return research_metrics.generate_report()
+    return config.metrics.generate_report()
 
 @app.get("/api/test-connections")
 async def test_connections():
@@ -204,7 +201,7 @@ async def test_connections():
         }
     
     # Log test as a system task
-    research_metrics.log_agent_task("System", True)
+    config.metrics.log_agent_task("System", True)
     return results
 
 @app.get("/api/test-research-manager")
@@ -229,7 +226,7 @@ async def test_research_manager():
         updated_state = manager.create_research_plan(state)
         
         # Log successful test
-        research_metrics.log_agent_task("ResearchManagerAgent", True)
+        config.metrics.log_agent_task("ResearchManagerAgent", True)
         
         return {
             "success": True,
@@ -242,7 +239,7 @@ async def test_research_manager():
         tb = traceback.format_exc()
         
         # Log failed test
-        research_metrics.log_agent_task("ResearchManagerAgent", False)
+        config.metrics.log_agent_task("ResearchManagerAgent", False)
         
         return {
             "success": False,
