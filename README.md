@@ -237,8 +237,7 @@ multi-agent-research-assistant/
 │   |   └── index.js
 |   └── package.json
 ├── tests/                
-|   └── evaluation/
-│       └── test_performance_metrics.py
+|   └── test_performance_metrics.py
 ├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt
