@@ -1,6 +1,8 @@
 # backend/graph/research_graph.py
 from backend.services.approval_service import ApprovalService
 from backend.models.state import Message, MessageType
+from backend.config import config  # Add import
+from backend.evaluation.report_generator import generate_performance_report  # Add import
 from typing import Dict, Any, Set
 
 class SimpleOrchestrator:
@@ -10,10 +12,10 @@ class SimpleOrchestrator:
         self.agents = agents
         self.approval_service = ApprovalService()  # Initialize approval service
     
-    def stream(self, initial_state, config=None):
+    def stream(self, initial_state, config_settings=None):
         """Run the research workflow and yield states at each step."""
-        config = config or {}
-        max_iterations = config.get("max_iterations", 20)
+        config_settings = config_settings or {}
+        max_iterations = config_settings.get("max_iterations", 20)
         
         # Initialize state
         state = initial_state
@@ -170,6 +172,9 @@ Further research is recommended to fully address {state.research_question}.
                     agent="system"
                 ))
                 
+                # Generate performance report
+                self._generate_performance_report()
+                
                 yield state
                 break
             else:
@@ -180,7 +185,15 @@ Further research is recommended to fully address {state.research_question}.
             # If research is complete, break the loop
             if state.status == "complete":
                 print("Research status marked as complete. Ending workflow.")
+                # Generate performance report
+                self._generate_performance_report()
                 break
+    
+    def _generate_performance_report(self):
+        """Generate performance report if enabled"""
+        if config.PERFORMANCE_REPORTING:
+            report = config.metrics.generate_report()
+            generate_performance_report(report)
     
     def _determine_next_agent(self, state):
         """Determine which agent should process the state next."""
