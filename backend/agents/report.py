@@ -76,6 +76,8 @@ class ReportGenerationAgent:
     
     def process(self, state: ResearchState) -> ResearchState:
         """Main processing function for the Report Generation Agent with approval workflow"""
+        tools_used = []  # Track tools used in this processing step
+        
         # Find report tasks that haven't been completed
         report_tasks = [
             task for task in state.tasks 
@@ -128,6 +130,7 @@ class ReportGenerationAgent:
         # Generate citations
         try:
             citations = self.generate_citations(state.sources)
+            tools_used.append("format_citations")
         except Exception as e:
             print(f"Error in citation generation: {str(e)}")
             citations = [f"Source {i+1}: {source.title}. {source.url}" for i, source in enumerate(state.sources)]
@@ -177,6 +180,7 @@ class ReportGenerationAgent:
             
             # Store as DRAFT, not final report yet
             state.report_draft = response
+            tools_used.append("draft_report")
         except Exception as e:
             print(f"Error generating report draft: {str(e)}")
             state.report_draft = self._create_fallback_report(state)
@@ -229,6 +233,12 @@ class ReportGenerationAgent:
         # Mark task as completed
         state.completed_tasks.append(task.id)
         state.status = "complete"
+        
+        # Add metadata to state
+        state.metadata = {
+            "agent": self.__class__.__name__,
+            "tools_used": tools_used
+        }
         
         # Add success message
         state.messages.append(Message(
