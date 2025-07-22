@@ -202,12 +202,16 @@ multi-agent-research-assistant/
 │   │   ├── analysis.py      # Document Analysis Agent
 │   │   ├── evaluation.py    # Critical Evaluation Agent
 │   │   └── report.py        # Report Generation Agent
+│   ├── evaluation/              
+│   │   ├── metrics.py
+│   │   └── rreport_generator.py
 │   ├── graph/               # Workflow orchestration
 │   │   ├── research_graph.py
 │   │   └── routers.py
 │   ├── models/              # Data models
 │   │   └── state.py
 │   ├── services/            # Core services
+│   │   ├── approval_service.py
 │   │   ├── ollama_client.py
 │   │   └── research_service.py
 │   ├── tools/               # Utility tools
@@ -216,11 +220,12 @@ multi-agent-research-assistant/
 │   │   └── citation.py
 │   ├── config.py
 │   └── main.py              # FastAPI application
-├── frontend/                # React frontend (optional)
+├── frontend/                # React frontend
 |   |── public/
 │   │   └── index.html
 │   ├── src/
 │   |   ├── components/
+│   |   |   ├── ApprovalModal.js
 │   |   |   ├── ResearchForm.js
 │   |   |   ├── ResearchResults.js
 │   │   |   └── ResearchStatus.js
@@ -231,6 +236,9 @@ multi-agent-research-assistant/
 │   |   ├── App.js
 │   |   └── index.js
 |   └── package.json
+├── tests/                
+|   └── evaluation/
+│       └── test_performance_metrics.py
 ├── docker-compose.yml
 ├── Dockerfile
 ├── requirements.txt
