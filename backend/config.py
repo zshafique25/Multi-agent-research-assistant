@@ -1,30 +1,30 @@
 # backend/config.py
 import os
 from dotenv import load_dotenv
-from backend.evaluation.metrics import ResearchMetrics  # Add import
+from .evaluation.metrics import ResearchMetrics
 
 # Load environment variables
 load_dotenv()
 
-# API Keys
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
-
-# Ollama Configuration
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
-
-# Application Settings
-DEBUG = os.getenv("DEBUG", "False").lower() == "true"
-PORT = int(os.getenv("PORT", 8000))
-
-# Performance Tracking Settings
-PERFORMANCE_TRACKING = os.getenv("PERFORMANCE_TRACKING", "True").lower() == "true"
-PERFORMANCE_REPORTING = os.getenv("PERFORMANCE_REPORTING", "True").lower() == "true"
-
-# Create shared metrics instance
 class Config:
     def __init__(self):
+        # API Keys
+        self.TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+        
+        # Ollama Configuration
+        self.OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+        self.OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "mistral")
+        
+        # Application Settings
+        self.DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+        self.PORT = int(os.getenv("PORT", 8000))
+        
+        # Performance Tracking Settings
+        self.PERFORMANCE_TRACKING = os.getenv("PERFORMANCE_TRACKING", "True").lower() == "true"
+        self.PERFORMANCE_REPORTING = os.getenv("PERFORMANCE_REPORTING", "True").lower() == "true"
+        
+        # Metrics instance
         self.metrics = ResearchMetrics()
 
-# Global configuration instance
+# Create global configuration instance
 config = Config()
