@@ -79,3 +79,18 @@ class ResearchService:
             current_state.status = "error"
             current_state.report = f"Research encountered an error: {str(e)}"
             self.research_states[state.research_id] = current_state
+
+            self._generate_performance_report()
+            raise
+    
+        # Generate performance report on success
+        self._generate_performance_report()
+    
+def _generate_performance_report(self):
+    """Generate performance report if enabled"""
+    from backend.config import config
+    if config.PERFORMANCE_REPORTING:
+        from backend.evaluation.report_generator import generate_performance_report
+        report = config.metrics.generate_report()
+        generate_performance_report(report)
+
