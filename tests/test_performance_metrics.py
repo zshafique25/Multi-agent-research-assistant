@@ -4,7 +4,7 @@ import os
 import pytest
 
 # Add backend to path so we can import modules
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../backend'))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../backend')))
 
 from evaluation.metrics import ResearchMetrics
 
@@ -56,3 +56,4 @@ def test_metrics_reset():
 
 if __name__ == "__main__":
     pytest.main([__file__])
+
